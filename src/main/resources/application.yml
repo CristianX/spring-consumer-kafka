@@ -1,0 +1,10 @@
+server:
+  port: 8081
+
+topic:
+  name: t.cola.inicial
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://root:Rm3MpB4vR5AXPL@localhost:6400/replica-personas?authSource=admin
