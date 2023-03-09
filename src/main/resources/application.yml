@@ -2,9 +2,13 @@ server:
   port: 8081
 
 topic:
-  name: t.cola.inicial
+  name: t.food.order
 
 spring:
+  kafka:
+    consumer:
+      group-id: "default"
+    bootstrap-servers: 172.16.20.32:9092
   data:
     mongodb:
       uri: mongodb://root:Rm3MpB4vR5AXPL@localhost:6400/replica-personas?authSource=admin
