@@ -1,8 +1,11 @@
 package gob.mdmq.springconsumerkafka.controller;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.core.io.FileSystemResource;
@@ -26,10 +29,9 @@ import lombok.extern.slf4j.Slf4j;
 public class Consumer {
 
     public List<Server> ListaServidores = Arrays.asList(
-            new Server("smtp.gmail.com", 587, "david1", "david", 0, null),
-            new Server("smtp.gmail.com", 587, "david2", "david", 0, null),
-            new Server("smtp.gmail.com", 587, "david3", "david", 0, null),
-            new Server("smtp.gmail.com", 587, "david4", "david", 0, null));
+            new Server("bh8954.banahosting.com", 587, "david@nebulartech.com", "A0H1wky^pW7R", 0, null),
+            new Server("bh8954.banahosting.com", 587, "cristian@nebulartech.com", "Qc+#MvMTX.F{", 0, null),
+            new Server("bh8954.banahosting.com", 587, "estefy@nebulartech.com", "er#z[k7AE.N.", 0, null));
 
     public List<JavaMailSender> mailSenders;
 
@@ -55,32 +57,64 @@ public class Consumer {
             log.info("***************DESTINATARIO CONSUMIDO***************** {}", correo.getDestinatarios());
 
             // Calcular el número de correos enviados en la última hora
-            int currentCorreoCount = correoCount.incrementAndGet();
-            if (currentCorreoCount % maxCorreosPorHoraPorServidor == 0) {
-                // Esperar un minuto antes de continuar enviando correos
+            /*
+             * int currentCorreoCount = correoCount.incrementAndGet();
+             * if (currentCorreoCount % maxCorreosPorHoraPorServidor == 0) {
+             * // Esperar un minuto antes de continuar enviando correos
+             * try {
+             * log.info(String.
+             * format("Limite de correos por hora alcanzado. Esperando 1 minuto..."));
+             * Thread.sleep(60 * 1000);
+             * } catch (InterruptedException e) {
+             * log.info("Error al esperar antes de enviar el siguiente correo", e);
+             * }
+             * // Reiniciar el contador de correos enviados
+             * correoCount.set(0);
+             * }
+             */
+            /*
+             * int cantidadDisponibles = getAvailableServers().size();
+             * if (cantidadDisponibles == 0) {
+             * // Esperar un minuto antes de continuar enviando correos
+             * try {
+             * log.info(String.
+             * format("Limite de correos por hora alcanzado. Esperando 1 minuto..."));
+             * Thread.sleep(60 * 1000);
+             * } catch (InterruptedException e) {
+             * log.info("Error al esperar antes de enviar el siguiente correo", e);
+             * }
+             * }
+             */
+
+            // Obtener el siguiente servidor disponible según el balanceo Round-Robin
+            Integer serverIndex = getNextServerIndex(); // Si no hay servidores disponibles, retornar -1
+            if (serverIndex == -1) {
                 try {
                     log.info(String.format("Limite de correos por hora alcanzado. Esperando 1 minuto..."));
                     Thread.sleep(60 * 1000);
-                } catch (InterruptedException e) {
-                    log.info("Error al esperar antes de enviar el siguiente correo", e);
+                    serverIndex = getNextServerIndex();
+                } catch (Exception e) {
+                    // TODO: handle exception
                 }
-                // Reiniciar el contador de correos enviados
-                correoCount.set(0);
             }
-            // Obtener el siguiente servidor disponible según el balanceo Round-Robin
-            Integer serverIndex = getNextServerIndex();
             JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
 
             mailSender.setHost(ListaServidores.get(serverIndex).getSmtp());
             mailSender.setPort(ListaServidores.get(serverIndex).getPuerto());
             mailSender.setUsername(ListaServidores.get(serverIndex).getUsuario());
             mailSender.setPassword(ListaServidores.get(serverIndex).getPassword());
-            
-            //JavaMailSender mailSender = mailSenders.get(getNextServerIndex());
+
+            // debug
+            /*
+             * Properties props = mailSender.getJavaMailProperties();
+             * props.put("mail.debug", "true");
+             */
+
+            // JavaMailSender mailSender = mailSenders.get(getNextServerIndex());
 
             // Enviar el correo
             try {
-                sendEmail(correo, mailSender);
+                sendEmail(correo, mailSender, ListaServidores.get(serverIndex).getUsuario());
             } catch (MessagingException e) {
                 log.info(String.format("Error al enviar el correo: %s", correo.toString()), e);
             }
@@ -91,11 +125,11 @@ public class Consumer {
 
     }
 
-    public void sendEmail(Correo correo, JavaMailSender mailSender) throws MessagingException {
+    public void sendEmail(Correo correo, JavaMailSender mailSender, String origen) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
-        helper.setFrom(correo.getRemitente());
+        helper.setFrom(origen);
         helper.setTo(correo.getDestinatarios());
         helper.setSubject(correo.getAsunto());
         helper.setText(correo.getMensaje());
@@ -136,9 +170,11 @@ public class Consumer {
 
         // Verificar si el servidor ha alcanzado el límite de envío por hora
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime nowServer = now.minusMinutes(2);
 
-        if (server.getLastHourSent() != null && server.getLastHourSent().isAfter(now.minusHours(1))) {
-            if (server.getCantidadCorreosEnviados() >= 82) {
+        if (server.getLastHourSent() != null && server.getLastHourSent().isAfter(nowServer)) {
+            // Aun no pasa una hora
+            if (server.getCantidadCorreosEnviados() >= 2) {
                 // Si ha alcanzado el límite, se descarta y se pasa al siguiente
                 serverIndex = getNextServerIndex();
             }
@@ -155,16 +191,24 @@ public class Consumer {
         return serverIndex;
     }
 
-    private List<Server> getAvailableServers() {
+   /*  private List<Server> getAvailableServers() {
         // Obtener la lista de servidores disponibles
         // De la listaServidores, obtener los servidores que no hayan alcanzado el
         // límite
-        ListaServidores.forEach(server -> {
+        List<Server> servidores = ListaServidores;
+        List<Server> servidores1 = ListaServidores;
+
+        servidores.forEach(server -> {
             if (server.getLastHourSent() != null
-                    && server.getLastHourSent().isAfter(LocalDateTime.now().minusHours(1))) {
-                if (server.getCantidadCorreosEnviados() >= 82) {
+                    && server.getLastHourSent().isAfter(LocalDateTime.now().minusMinutes(10))) {
+                if (server.getCantidadCorreosEnviados() >= 2) {
                     // Si ha alcanzado el límite, se descarta y se pasa al siguiente
-                    ListaServidores.remove(server);
+                    try {
+                        servidores1.remove(server);
+                    } catch (Exception e) {
+                        System.out.println(e);
+                    }
+
                 }
             } else {
                 // Si ya pasó una hora, se reinicia el contador lastHourSent
@@ -172,12 +216,59 @@ public class Consumer {
                 server.setCantidadCorreosEnviados(0);
             }
         });
-        return ListaServidores;
+
+        return servidores1;
+
+
+
+        
+    } */
+
+    private List<Server> getAvailableServers() {
+        // Obtener la lista de servidores disponibles
+        // De la listaServidores, obtener los servidores que no hayan alcanzado el
+        // límite
+        List<Server> servidores = ListaServidores;
+        List<Server> availableServers = new ArrayList<>();
+    
+        servidores.forEach(server -> {
+            if (server.getLastHourSent() != null
+                    && server.getLastHourSent().isAfter(LocalDateTime.now().minusMinutes(2))) {
+                if (server.getCantidadCorreosEnviados() < 2) {
+                    // Si no ha alcanzado el límite, se agrega a la lista de servidores disponibles
+                    availableServers.add(server);
+                }
+            } else {
+                // Si ya pasó una hora, se reinicia el contador lastHourSent
+                server.setLastHourSent(LocalDateTime.now());
+                server.setCantidadCorreosEnviados(0);
+                availableServers.add(server); // Se agrega a la lista de servidores disponibles
+            }
+        });
+    
+        return availableServers;
     }
 
     private int getNextServerCounter() {
         // Obtener el contador de servidores
         // Integer index = counterRepository.getNextServerIndex();
+        // maximo numero
+        int max = ListaServidores.size();
+        // si el contador es mayor al maximo numero de servidores
+        if (contadorServidores > max) {
+            // reiniciar el contador
+            /*
+             * try {
+             * log.info(String.
+             * format("Limite de correos por hora alcanzado. Esperando 1 minuto..."));
+             * Thread.sleep(60 * 1000);
+             * } catch (Exception e) {
+             * // TODO: handle exception
+             * }
+             */
+
+            contadorServidores = 0;
+        }
         Integer contador = contadorServidores;
         return contador;
     }
