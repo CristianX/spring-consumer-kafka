@@ -4,11 +4,35 @@ server:
 topic:
   name: t.food.order
 
+miapp:
+  servidores:
+    - smtp: "bh8954.banahosting.com"
+      puerto: 587
+      usuario: "david@nebulartech.com"
+      password: "A0H1wky^pW7R"
+      cantidadCorreosEnviados: 0
+      lastHourSent: null
+    - smtp: "bh8954.banahosting.com"
+      puerto: 587
+      usuario: "cristian@nebulartech.com"
+      password: "Qc+#MvMTX.F{"
+      cantidadCorreosEnviados: 0
+      lastHourSent: null
+    - smtp: "bh8954.banahosting.com"
+      puerto: 587
+      usuario: "estefy@nebulartech.com"
+      password: "er#z[k7AE.N."
+      cantidadCorreosEnviados: 0
+      lastHourSent: null
+    
+
 spring:
-  #kafka:
-  #  consumer:
-  #    group-id: "default"
-  #  bootstrap-servers: 172.16.20.32:9092
   data:
     mongodb:
-      uri: mongodb://root:Rm3MpB4vR5AXPL@localhost:6400/replica-personas?authSource=admin
+      uri: mongodb://root:Rm3MpB4vR5AXPL@localhost:6400/MDMQ_NOTIFICACIONES_CORREO?authSource=admin
+  kafka:
+    consumer:
+      #group-id: group-1
+      auto-offset-reset: earliest
+      session-timeout-ms: 125000
+      enable-auto-commit: false
