@@ -1,5 +1,6 @@
 package gob.mdmq.springconsumerkafka.controller;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,18 +40,16 @@ import org.springframework.kafka.core.KafkaTemplate;
 @Component
 public class Consumer {
 
-    /*
-     * public List<Server> ListaServidores = Arrays.asList(
-     * new Server("bh8954.banahosting.com", 587, "david@nebulartech.com",
-     * "A0H1wky^pW7R", 0, null),
-     * new Server("bh8954.banahosting.com", 587, "cristian@nebulartech.com",
-     * "Qc+#MvMTX.F{", 0, null),
-     * new Server("bh8954.banahosting.com", 587, "estefy@nebulartech.com",
-     * "er#z[k7AE.N.", 0, null));
-     * 
-     */
-    @Value("${miapp.servidores}")
-    private String misObjetos;
+    public List<Server> ListaServidores = Arrays.asList(
+            new Server("bh8954.banahosting.com", 587, "david@nebulartech.com",
+                    "A0H1wky^pW7R", 0, null),
+            new Server("bh8954.banahosting.com", 587, "cristian@nebulartech.com",
+                    "Qc+#MvMTX.F{", 0, null),
+            new Server("bh8954.banahosting.com", 587, "estefy@nebulartech.com",
+                    "er#z[k7AE.N.", 0, null));
+
+    // @Value("${miapp.servidores}")
+    // private String misObjetos;
 
     public List<JavaMailSender> mailSenders;
 
@@ -69,9 +68,9 @@ public class Consumer {
             throws JsonProcessingException {
 
         try {
-            ObjectMapper mapper1 = new ObjectMapper();
-            Server[] ListaServidores1 = mapper1.readValue(misObjetos, Server[].class);
-            List<Server> ListaServidores = Arrays.asList(ListaServidores1);
+            // ObjectMapper mapper1 = new ObjectMapper();
+            // Server[] ListaServidores1 = mapper1.readValue("misObjetos", Server[].class);
+            // List<Server> ListaServidores = Arrays.asList(ListaServidores1);
 
             ObjectMapper mapper = new ObjectMapper();
             // Transfomamos el mensaje que llega del broker en un objeto de tipo Correo
@@ -114,9 +113,11 @@ public class Consumer {
 
             while (serverIndex == -1) {
                 log.info(String.format("Limite de correos por hora alcanzado. Esperando 2 minuto..."));
-                Thread.sleep(120 * 1000);
+                // Thread.sleep(120 * 1000);
                 serverIndex = getNextServerIndex();
             }
+
+            acknowledgment.acknowledge();
 
             JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
             mailSender.setHost(ListaServidores.get(serverIndex).getSmtp());
@@ -196,6 +197,7 @@ public class Consumer {
              */
         } catch (Exception e) {
             System.out.println("Error en el consumo del mensaje: " + e);
+            acknowledgment.nack(Duration.ofSeconds(1000));
         }
 
     }
@@ -311,10 +313,10 @@ public class Consumer {
         // De la listaServidores, obtener los servidores que no hayan alcanzado el
         // límite
         try {
-            ObjectMapper mapper1 = new ObjectMapper();
-            Server[] ListaServidores1 = mapper1.readValue(misObjetos, Server[].class);
-            List<Server> servidores = Arrays.asList(ListaServidores1);
-            // List<Server> servidores = ListaServidores;
+            // ObjectMapper mapper1 = new ObjectMapper();
+            // Server[] ListaServidores1 = mapper1.readValue("misObjetos", Server[].class);
+            // List<Server> servidores = Arrays.asList(ListaServidores1);
+            List<Server> servidores = ListaServidores;
             List<Server> availableServers = new ArrayList<>();
             servidores.forEach(server -> {
                 if (server.getLastHourSent() != null

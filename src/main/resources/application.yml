@@ -6,33 +6,35 @@ topic:
 
 miapp:
   servidores:
-    - smtp: "bh8954.banahosting.com"
+    - smtp: 'bh8954.banahosting.com'
       puerto: 587
-      usuario: "david@nebulartech.com"
-      password: "A0H1wky^pW7R"
+      usuario: 'david@nebulartech.com'
+      password: 'A0H1wky^pW7R'
       cantidadCorreosEnviados: 0
       lastHourSent: null
-    - smtp: "bh8954.banahosting.com"
+    - smtp: 'bh8954.banahosting.com'
       puerto: 587
-      usuario: "cristian@nebulartech.com"
-      password: "Qc+#MvMTX.F{"
+      usuario: 'cristian@nebulartech.com'
+      password: 'Qc+#MvMTX.F{'
       cantidadCorreosEnviados: 0
       lastHourSent: null
-    - smtp: "bh8954.banahosting.com"
+    - smtp: 'bh8954.banahosting.com'
       puerto: 587
-      usuario: "estefy@nebulartech.com"
-      password: "er#z[k7AE.N."
+      usuario: 'estefy@nebulartech.com'
+      password: 'er#z[k7AE.N.'
       cantidadCorreosEnviados: 0
       lastHourSent: null
-    
 
 spring:
   data:
     mongodb:
-      uri: mongodb://root:Rm3MpB4vR5AXPL@localhost:6400/MDMQ_NOTIFICACIONES_CORREO?authSource=admin
+      uri: mongodb://root:Rm3MpB4vR5AXPL@172.22.4.160:6400/MDMQ_NOTIFICACIONES_CORREO?authSource=admin
   kafka:
     consumer:
       #group-id: group-1
       auto-offset-reset: earliest
       session-timeout-ms: 125000
-      enable-auto-commit: false
+      # enable-auto-commit: false
+    # bootstrap-server: 172.22.4.106:9092
+    # listener:
+    #   ack-mode: manual_immediate
