@@ -36,3 +36,4 @@ spring:
       auto-offset-reset: earliest
       session-timeout-ms: 125000
       enable-auto-commit: false
+
