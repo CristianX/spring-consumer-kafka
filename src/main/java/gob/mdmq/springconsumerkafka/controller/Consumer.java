@@ -1,5 +1,6 @@
 package gob.mdmq.springconsumerkafka.controller;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.stereotype.Component;
 
@@ -82,7 +84,7 @@ public class Consumer {
      */
 
     @KafkaListener(topics = { "smsr1", "smsr2", "smsr3" })
-    public void consumeMessage(String message) throws JsonProcessingException {
+    public void consumeMessage(String message, Acknowledgment acknowledgment) throws JsonProcessingException {
 
         try {
             
@@ -97,9 +99,11 @@ public class Consumer {
 
             while (serverIndex == -1) {
                 log.info(String.format("Limite de correos por hora alcanzado. Esperando 2 minuto..."));
-                Thread.sleep(120 * 1000);
+                // Thread.sleep(120 * 1000);
                 serverIndex = getNextServerIndex();
             }
+
+            acknowledgment.acknowledge();
 
             JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
             mailSender.setHost(ListaServidores.get(serverIndex).getSmtp());
@@ -129,6 +133,7 @@ public class Consumer {
 
         } catch (Exception e) {
             System.out.println("Error en el consumo del mensaje: " + e);
+            acknowledgment.nack(Duration.ofSeconds(1000));
         }
 
     }
@@ -207,25 +212,31 @@ public class Consumer {
         // Obtener la lista de servidores disponibles
         // De la listaServidores, obtener los servidores que no hayan alcanzado el
         // límite
-        List<Server> servidores = ListaServidores;
-        List<Server> availableServers = new ArrayList<>();
-
-        servidores.forEach(server -> {
-            if (server.getLastHourSent() != null
-                    && server.getLastHourSent().isAfter(LocalDateTime.now().minusMinutes(1))) {
-                if (server.getCantidadCorreosEnviados() < 2) {
-                    // Si no ha alcanzado el límite, se agrega a la lista de servidores disponibles
-                    availableServers.add(server);
+        try {
+            // ObjectMapper mapper1 = new ObjectMapper();
+            // Server[] ListaServidores1 = mapper1.readValue("misObjetos", Server[].class);
+            // List<Server> servidores = Arrays.asList(ListaServidores1);
+            List<Server> servidores = ListaServidores;
+            List<Server> availableServers = new ArrayList<>();
+            servidores.forEach(server -> {
+                if (server.getLastHourSent() != null
+                        && server.getLastHourSent().isAfter(LocalDateTime.now().minusMinutes(1))) {
+                    if (server.getCantidadCorreosEnviados() < 2) {
+                        // Si no ha alcanzado el límite, se agrega a la lista de servidores disponibles
+                        availableServers.add(server);
+                    }
+                } else {
+                    // Si ya pasó una hora, se reinicia el contador lastHourSent
+                    server.setLastHourSent(LocalDateTime.now());
+                    server.setCantidadCorreosEnviados(0);
+                    availableServers.add(server); // Se agrega a la lista de servidores disponibles
                 }
-            } else {
-                // Si ya pasó una hora, se reinicia el contador lastHourSent
-                server.setLastHourSent(LocalDateTime.now());
-                server.setCantidadCorreosEnviados(0);
-                availableServers.add(server); // Se agrega a la lista de servidores disponibles
-            }
-        });
-
-        return availableServers;
+            });
+            return availableServers;
+        } catch (Exception e) {
+            // TODO: handle exception
+            return null;
+        }
     }
 
     private int getNextServerCounter(int max) {
