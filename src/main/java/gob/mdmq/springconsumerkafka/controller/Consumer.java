@@ -3,17 +3,13 @@ package gob.mdmq.springconsumerkafka.controller;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,12 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.Payload;
 
 import gob.mdmq.springconsumerkafka.model.CorreoBDD;
 import gob.mdmq.springconsumerkafka.model.Server;
-import gob.mdmq.springconsumerkafka.repository.ServerRepository;
 import gob.mdmq.springconsumerkafka.service.EmailService;
 import gob.mdmq.springconsumerkafka.service.ServerService;
 import jakarta.annotation.PostConstruct;
@@ -34,24 +27,20 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 
-import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.common.TopicPartition;
-import org.springframework.kafka.core.KafkaTemplate;
-
 @Slf4j
 @Component
 public class Consumer {
 
+    @Value("${variables.propiedades.tiempoEsperaServidor}")
+    private int tiempoEsperaServidor;
 
-    
+    @Value("${variables.propiedades.cantidadCorreosEnviados}")
+    private int cantidadCorreosEnviados;
 
     @Autowired
     private MongoTemplate mongoTemplate;
     
-    
     public List<Server> ListaServidores;
-
 
     @PostConstruct
     public void init() {
@@ -59,15 +48,6 @@ public class Consumer {
         ListaServidores = mongoTemplate.findAll(Server.class);
     }
 
-    
-
-    /* public List<Server> ListaServidores = Arrays.asList(
-            new Server("bh8954.banahosting.com", 587, "david@nebulartech.com", "A0H1wky^pW7R", 0, null),
-            new Server("bh8954.banahosting.com", 587, "cristian@nebulartech.com", "Qc+#MvMTX.F{", 0, null),
-            new Server("bh8954.banahosting.com", 587, "estefy@nebulartech.com", "er#z[k7AE.N.", 0, null));
-
-    
- */
     public List<JavaMailSender> mailSenders;
 
     public int contadorServidores = 0;
@@ -78,10 +58,6 @@ public class Consumer {
     @Autowired
     public ServerService serverService;
 
-    /*
-     * @Autowired
-     * private KafkaTemplate<String, Object> kafkaTemplate1;
-     */
 
     @KafkaListener(topics = { "smsr1", "smsr2", "smsr3" })
     public void consumeMessage(String message, Acknowledgment acknowledgment) throws JsonProcessingException {
@@ -98,12 +74,9 @@ public class Consumer {
             Integer serverIndex = getNextServerIndex(); // Si no hay servidores disponibles, retornar -1
 
             while (serverIndex == -1) {
-                log.info(String.format("Limite de correos por hora alcanzado. Esperando 2 minuto..."));
-                // Thread.sleep(120 * 1000);
+                log.info(String.format("Esperando servidor disponible"));
                 serverIndex = getNextServerIndex();
             }
-
-            acknowledgment.acknowledge();
 
             JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
             mailSender.setHost(ListaServidores.get(serverIndex).getSmtp());
@@ -115,15 +88,7 @@ public class Consumer {
                 correoBDD.setEnviado(true);
                 emailService.save(correoBDD);
                 // Confirma que el mensaje fue procesado correctamente
-                /*
-                 * TopicPartition partition = new TopicPartition("smsr3", 0);
-                 * OffsetAndMetadata offsetAndMetadata = new OffsetAndMetadata(offset + 1);
-                 * Map<TopicPartition, OffsetAndMetadata> offsetsMap =
-                 * Collections.singletonMap(partition, offsetAndMetadata);
-                 * ConsumerGroupMetadata groupMetadata = new
-                 * ConsumerGroupMetadata("nombre_del_grupo_de_consumidores");
-                 * kafkaTemplate1.sendOffsetsToTransaction(offsetsMap, groupMetadata);
-                 */
+                acknowledgment.acknowledge();
 
             } catch (MessagingException e) {
                 correoBDD.setEnviado(false);
@@ -164,21 +129,16 @@ public class Consumer {
 
     public int getNextServerIndex() {
         // Implementar balanceo Round-Robin
-
         // Obtener la lista de servidores disponibles
         List<Server> servers = getAvailableServers();
-
         // Si no hay servidores disponibles, retornar -1
         if (servers.isEmpty()) {
             return -1;
         }
-
         // Obtener el contador de servidores
         int index = getNextServerCounter(servers.size());
-
         // Incrementar el contador
         // setNextServerCounter(index + 1);
-
         // Calcular el índice del servidor a utilizar
         int serverIndex = index % servers.size();
 
@@ -187,11 +147,11 @@ public class Consumer {
         setNextServerCounter(index + 1);
         // Verificar si el servidor ha alcanzado el límite de envío por hora
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime nowServer = now.minusMinutes(1);
+        LocalDateTime nowServer = now.minusMinutes(tiempoEsperaServidor);
 
         if (server.getLastHourSent() != null && server.getLastHourSent().isAfter(nowServer)) {
             // Aun no pasa una hora
-            if (server.getCantidadCorreosEnviados() >= 2) {
+            if (server.getCantidadCorreosEnviados() >= cantidadCorreosEnviados) {
                 // Si ha alcanzado el límite, se descarta y se pasa al siguiente
                 serverIndex = getNextServerIndex();
             }
@@ -213,15 +173,12 @@ public class Consumer {
         // De la listaServidores, obtener los servidores que no hayan alcanzado el
         // límite
         try {
-            // ObjectMapper mapper1 = new ObjectMapper();
-            // Server[] ListaServidores1 = mapper1.readValue("misObjetos", Server[].class);
-            // List<Server> servidores = Arrays.asList(ListaServidores1);
             List<Server> servidores = ListaServidores;
             List<Server> availableServers = new ArrayList<>();
             servidores.forEach(server -> {
                 if (server.getLastHourSent() != null
-                        && server.getLastHourSent().isAfter(LocalDateTime.now().minusMinutes(1))) {
-                    if (server.getCantidadCorreosEnviados() < 2) {
+                        && server.getLastHourSent().isAfter(LocalDateTime.now().minusMinutes(tiempoEsperaServidor))) {
+                    if (server.getCantidadCorreosEnviados() < cantidadCorreosEnviados) {
                         // Si no ha alcanzado el límite, se agrega a la lista de servidores disponibles
                         availableServers.add(server);
                     }
